@@ -1,6 +1,19 @@
 import { TimetableSlot, TimetableTemplate, DayOfWeekKey } from '../types';
 
-const TIMETABLE_STORAGE_KEY = 'preppulse_timetable_slots_v1';
+const TIMETABLE_STORAGE_KEY = 'preppulse_timetable_slots_v3';
+
+export function clearAllTimetableStorage(): TimetableSlot[] {
+  try {
+    localStorage.removeItem('preppulse_timetable_slots_v1');
+    localStorage.removeItem('preppulse_timetable_slots_v2');
+    localStorage.removeItem('preppulse_timetable_slots_v3');
+  } catch {
+    // ignore
+  }
+  const fresh = DEFAULT_TIMETABLE_SLOTS.map((s) => ({ ...s, isCompleted: false }));
+  saveTimetableSlots(fresh);
+  return fresh;
+}
 
 export const DAYS_OF_WEEK: { key: DayOfWeekKey; label: string; short: string }[] = [
   { key: 'all', label: 'All Days', short: 'All' },
@@ -35,7 +48,7 @@ export const DEFAULT_TIMETABLE_SLOTS: TimetableSlot[] = [
     subject: 'Physics',
     description: 'Solve 35 PYQs from Kinematics, Rotational Motion & Electrostatics. Mark error notebook.',
     dayOfWeek: 'all',
-    isCompleted: true,
+    isCompleted: false,
     priority: 'high',
   },
   {
@@ -46,7 +59,7 @@ export const DEFAULT_TIMETABLE_SLOTS: TimetableSlot[] = [
     subject: 'Break / Wellness',
     description: 'Healthy breakfast, hydrate, brief 10-minute walk before heavy chemistry session.',
     dayOfWeek: 'all',
-    isCompleted: true,
+    isCompleted: false,
     priority: 'low',
   },
   {

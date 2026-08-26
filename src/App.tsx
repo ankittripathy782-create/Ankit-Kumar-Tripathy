@@ -13,7 +13,8 @@ import { StudyTimeTrackerModal } from './components/StudyTimeTrackerModal';
 import { FloatingStudyTimer } from './components/FloatingStudyTimer';
 import { TimetableScreen } from './components/TimetableScreen';
 import { CelebrationToast, CelebrationData } from './components/CelebrationToast';
-import { TestConfig, TestResultData, Question, StreakTrackerState, TimetableSlot, TimetableTemplate } from './types';
+import { LoginProfileModal } from './components/LoginProfileModal';
+import { TestConfig, TestResultData, Question, StreakTrackerState, TimetableSlot, TimetableTemplate, UserProfile } from './types';
 
 import { generateTestQuestions, QUESTION_BANK } from './data/questionBank';
 import {
@@ -21,8 +22,13 @@ import {
   addStudyTime,
   formatHoursAndMinutes,
   STREAK_THRESHOLD_SECONDS,
+  resetTodayStudyTime,
+  clearAllStudyStorage,
 } from './data/studyStorage';
-import { loadTimetableSlots, saveTimetableSlots } from './data/timetableStorage';
+import { loadTimetableSlots, saveTimetableSlots, clearAllTimetableStorage } from './data/timetableStorage';
+import { loadUserProfile, saveUserProfile } from './data/userProfileStorage';
+import { clearSyllabusTrackerStorage } from './components/SyllabusTrackerModal';
+import { saveTestResultToHistory, clearAllTestAndHistoryData } from './data/testHistoryStorage';
 
 export default function App() {
   const [currentTab, setCurrentTab] = useState<NavTab>('home');
@@ -32,6 +38,10 @@ export default function App() {
   const [isReviewingMistakes, setIsReviewingMistakes] = useState<boolean>(false);
   const [isSyllabusTrackerOpen, setIsSyllabusTrackerOpen] = useState<boolean>(false);
   const [initialTrackerCategory, setInitialTrackerCategory] = useState<string>('all');
+
+  // User Profile & Authentication State
+  const [userProfile, setUserProfile] = useState<UserProfile>(() => loadUserProfile());
+  const [isLoginModalOpen, setIsLoginModalOpen] = useState<boolean>(false);
 
   // Study Time Tracker & Streak State
   const [trackerState, setTrackerState] = useState<StreakTrackerState>(() => loadStudyTrackerState());
@@ -43,6 +53,28 @@ export default function App() {
   const [timerTopicNotes, setTimerTopicNotes] = useState<string>('');
   const [timerMode, setTimerMode] = useState<'stopwatch' | 'pomodoro'>('stopwatch');
   const [pomodoroTargetMinutes, setPomodoroTargetMinutes] = useState<number>(45);
+
+  // Handle saving updated user profile
+  const handleSaveUserProfile = (newProfile: UserProfile) => {
+    setUserProfile(newProfile);
+    saveUserProfile(newProfile);
+    setCelebrationData({
+      id: `profile-save-${Date.now()}`,
+      title: '👤 Profile Details Saved!',
+      message: `Welcome ${newProfile.name}! Your preferences, avatar, and goals have been updated.`,
+      addedTimeFormatted: 'Profile Synced',
+      totalTimeFormatted: `${newProfile.targetExam} (${newProfile.targetYear})`,
+      isStreakUnlocked: trackerState.isStreakAchievedToday,
+      streakDays: trackerState.currentStreakDays,
+    });
+  };
+
+  const handleResetStudyTime = () => {
+    const updated = resetTodayStudyTime();
+    setTrackerState(updated);
+    setSessionSeconds(0);
+    setIsTimerRunning(false);
+  };
 
   // Celebratory Toast state
   const [celebrationData, setCelebrationData] = useState<CelebrationData | null>(null);
@@ -406,6 +438,7 @@ export default function App() {
   const handleFinishTest = (results: TestResultData) => {
     setActiveQuestions(null);
     setTestResult(results);
+    saveTestResultToHistory(results);
 
     // Auto-log test time as active study time with congratulations!
     if (results.timeSpentSeconds > 60) {
@@ -417,6 +450,31 @@ export default function App() {
         'custom'
       );
     }
+  };
+
+  const handleClearAllAppData = () => {
+    const freshStudyState = clearAllStudyStorage();
+    const freshSlots = clearAllTimetableStorage();
+    clearSyllabusTrackerStorage();
+    clearAllTestAndHistoryData();
+
+    setTrackerState(freshStudyState);
+    setTimetableSlots(freshSlots);
+    setSessionSeconds(0);
+    setIsTimerRunning(false);
+    setTestResult(null);
+    setActiveQuestions(null);
+    setCurrentTab('home');
+
+    setCelebrationData({
+      id: `reset-${Date.now()}`,
+      title: '🔄 Application Reset Complete',
+      message: 'All test responses, study timer logs, mistake questions, and timetable tasks have been cleared. You are starting completely fresh from the beginning!',
+      addedTimeFormatted: '0h 00m',
+      totalTimeFormatted: '0h 00m',
+      isStreakUnlocked: false,
+      streakDays: 0,
+    });
   };
 
   const handleExitTest = () => {
@@ -473,6 +531,7 @@ export default function App() {
         onOpenStudyTracker={handleOpenStudyTracker}
         todayStudySeconds={trackerState.todaySeconds + sessionSeconds}
         isStreakAchievedToday={trackerState.isStreakAchievedToday || (trackerState.todaySeconds + sessionSeconds >= STREAK_THRESHOLD_SECONDS)}
+        userProfile={userProfile}
       />
 
       {/* Main Content Area with safe spacing */}
@@ -513,6 +572,8 @@ export default function App() {
               trackerState.isStreakAchievedToday ||
               (trackerState.todaySeconds + sessionSeconds >= STREAK_THRESHOLD_SECONDS)
             }
+            userProfile={userProfile}
+            onOpenLoginModal={() => setIsLoginModalOpen(true)}
           />
 
         ) : currentTab === 'timetable' ? (
@@ -538,6 +599,7 @@ export default function App() {
               isStreakAchievedToday: trackerState.isStreakAchievedToday || (trackerState.todaySeconds + sessionSeconds >= STREAK_THRESHOLD_SECONDS),
             }}
             onOpenStudyTracker={handleOpenStudyTracker}
+            onNavigateToTests={() => setCurrentTab('tests')}
           />
         ) : (
           <ProfileScreen
@@ -548,6 +610,11 @@ export default function App() {
               todaySeconds: trackerState.todaySeconds + sessionSeconds,
               isStreakAchievedToday: trackerState.isStreakAchievedToday || (trackerState.todaySeconds + sessionSeconds >= STREAK_THRESHOLD_SECONDS),
             }}
+            userProfile={userProfile}
+            onOpenLoginModal={() => setIsLoginModalOpen(true)}
+            onUpdateProfile={handleSaveUserProfile}
+            onResetStudyTime={handleResetStudyTime}
+            onClearAllAppData={handleClearAllAppData}
           />
         )}
       </main>
@@ -601,6 +668,14 @@ export default function App() {
         onSelectTimerMode={setTimerMode}
         pomodoroTargetMinutes={pomodoroTargetMinutes}
         onSelectPomodoroTarget={setPomodoroTargetMinutes}
+      />
+
+      {/* User Login & Profile Modal */}
+      <LoginProfileModal
+        isOpen={isLoginModalOpen}
+        onClose={() => setIsLoginModalOpen(false)}
+        currentProfile={userProfile}
+        onSaveProfile={handleSaveUserProfile}
       />
 
       {/* Celebration Toast (Shown when time increases, milestones are reached, or 4-hour streak is earned) */}

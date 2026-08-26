@@ -1,6 +1,7 @@
-import React from 'react';
-import { TestConfig, TimetableSlot } from '../types';
+import React, { useMemo } from 'react';
+import { ExamType, TestConfig, TimetableSlot, UserProfile } from '../types';
 import { formatTime24to12, calculateTotalPlannedMinutes, formatDurationHuman } from '../data/timetableStorage';
+import { loadTestHistory } from '../data/testHistoryStorage';
 
 interface HomeScreenProps {
   onStartQuickDPP: () => void;
@@ -14,6 +15,10 @@ interface HomeScreenProps {
   todayStudySeconds: number;
   currentStreakDays: number;
   isStreakAchievedToday: boolean;
+  userProfile?: UserProfile;
+  onOpenLoginModal?: () => void;
+  selectedExam?: ExamType;
+  onSelectExam?: (exam: ExamType) => void;
 }
 
 export const HomeScreen: React.FC<HomeScreenProps> = ({
@@ -28,8 +33,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   todayStudySeconds,
   currentStreakDays,
   isStreakAchievedToday,
+  userProfile,
+  onOpenLoginModal,
+  selectedExam = 'NEET',
+  onSelectExam,
 }) => {
-
   const STREAK_GOAL_SECONDS = 14400; // 4 Hours
   const progressPercent = Math.min(100, Math.round((todayStudySeconds / STREAK_GOAL_SECONDS) * 100));
   const remainingSeconds = Math.max(0, STREAK_GOAL_SECONDS - todayStudySeconds);
@@ -41,6 +49,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     .filter((s) => !s.isCompleted)
     .slice(0, 3);
 
+  const recentTests = useMemo(() => loadTestHistory().slice(0, 3), []);
+
   const formatHoursMins = (secs: number) => {
     const h = Math.floor(secs / 3600);
     const m = Math.floor((secs % 3600) / 60);
@@ -49,6 +59,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     return `${h}h ${m}m`;
   };
 
+  const displayName = userProfile?.name?.trim() ? userProfile.name.split(' ')[0] : 'Scholar';
+  const targetExam = selectedExam || userProfile?.targetExam || 'NEET';
+  const dailyGoal = userProfile?.dailyGoalQuestions || 45;
+
   return (
     <div className="flex flex-col w-full max-w-2xl mx-auto px-4 sm:px-6 pt-5 pb-28 gap-6">
       {/* Welcome & 4-Hour Day Streak Banner */}
@@ -56,39 +70,88 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         <div className="absolute right-0 top-0 w-48 h-48 bg-white/10 rounded-full blur-3xl pointer-events-none" />
         <div className="relative z-10 flex flex-col gap-4">
           
-          {/* Creator Watermark Tag */}
+          {/* Creator Watermark Tag & Exam Switcher Row */}
           <div className="flex items-center justify-between flex-wrap gap-2">
             <div className="inline-flex items-center gap-1.5 bg-black/30 border border-white/20 px-3 py-1 rounded-full text-white/95 text-[11px] sm:text-[12px] font-extrabold tracking-wide backdrop-blur-md shadow-xs">
               <span className="material-symbols-outlined text-[15px] text-amber-300">verified</span>
               <span>PrepPulse by - ANKIT KUMAR TRIPATHY</span>
             </div>
-            <span className="bg-amber-400/20 text-amber-300 border border-amber-300/30 text-[11px] font-black px-2.5 py-0.5 rounded-full uppercase">
-              Min 4h/Day Streak
-            </span>
+            
+            {/* Direct Exam Selector in Banner */}
+            <div className="flex items-center bg-black/30 border border-white/20 rounded-full p-0.5 backdrop-blur-md">
+              <button
+                type="button"
+                onClick={() => onSelectExam?.('NEET')}
+                className={`px-2.5 py-0.5 rounded-full text-[11px] font-black transition-all cursor-pointer ${
+                  targetExam === 'NEET'
+                    ? 'bg-amber-400 text-black shadow-xs'
+                    : 'text-white/80 hover:text-white'
+                }`}
+              >
+                🩺 NEET
+              </button>
+              <button
+                type="button"
+                onClick={() => onSelectExam?.('JEE')}
+                className={`px-2.5 py-0.5 rounded-full text-[11px] font-black transition-all cursor-pointer ${
+                  targetExam === 'JEE'
+                    ? 'bg-amber-400 text-black shadow-xs'
+                    : 'text-white/80 hover:text-white'
+                }`}
+              >
+                📐 JEE
+              </button>
+            </div>
           </div>
 
-          <div className="flex items-start justify-between">
-            <div>
-              <div className="flex items-center gap-2 mb-1.5">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 mb-1.5 flex-wrap">
                 <span className="bg-white/20 text-white text-[11px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider backdrop-blur-sm">
-                  NEET & JEE MASTER PREP
+                  {targetExam === 'NEET' ? '🩺 NEET MEDICAL PREP (720M)' : '📐 JEE ENGINEERING PREP (300M)'}
                 </span>
+                {userProfile?.dreamCollege && (
+                  <span className="bg-amber-400/20 text-amber-200 border border-amber-300/30 text-[10px] font-bold px-2 py-0.5 rounded-full truncate max-w-[200px]">
+                    🎯 {userProfile.dreamCollege}
+                  </span>
+                )}
               </div>
-              <h2 className="text-[24px] font-black tracking-tight">Welcome back, Ankit! 👋</h2>
-              <p className="text-[14px] text-white/80 mt-0.5">
-                Target: 180 Qs full syllabus mastery & daily 4-hour deep study
+              <h2 className="text-[22px] sm:text-[25px] font-black tracking-tight truncate">
+                Welcome back, {displayName}! 👋
+              </h2>
+              <p className="text-[13px] text-white/80 mt-0.5">
+                Target: {dailyGoal} Qs daily practice ({targetExam === 'NEET' ? 'Phy, Chem, Botany, Zoology' : 'Phy, Chem, Mathematics'}) & 4h deep study streak
               </p>
             </div>
 
+            {/* User Profile Avatar with Edit trigger */}
+            {userProfile && onOpenLoginModal && (
+              <button
+                type="button"
+                onClick={onOpenLoginModal}
+                className="shrink-0 relative group p-0.5 rounded-2xl ring-2 ring-white/30 hover:ring-amber-300 transition-all cursor-pointer"
+                title="Edit Your Profile & Photo"
+              >
+                <img
+                  src={userProfile.avatarUrl}
+                  alt={userProfile.name}
+                  className="w-12 h-12 rounded-2xl object-cover bg-white/10 shadow-md"
+                />
+                <span className="absolute -bottom-1 -right-1 bg-amber-400 text-black w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-black shadow-xs">
+                  ✎
+                </span>
+              </button>
+            )}
+
             {/* Streak Counter Badge */}
-            <div className={`backdrop-blur-md rounded-2xl p-3.5 text-center border flex flex-col items-center shrink-0 min-w-[76px] transition-all shadow-md ${
+            <div className={`backdrop-blur-md rounded-2xl p-3 text-center border flex flex-col items-center shrink-0 min-w-[70px] transition-all shadow-md ${
               isStreakAchievedToday
                 ? 'bg-amber-400/25 border-amber-300/50 text-amber-200'
                 : 'bg-white/15 border-white/20 text-white'
             }`}>
-              <span className="text-[24px] leading-none animate-pulse">🔥</span>
-              <span className="text-[20px] font-black leading-tight mt-1">{currentStreakDays}</span>
-              <span className="text-[10px] uppercase font-extrabold tracking-wider opacity-90">
+              <span className="text-[22px] leading-none animate-pulse">🔥</span>
+              <span className="text-[18px] font-black leading-tight mt-1">{currentStreakDays}</span>
+              <span className="text-[9px] uppercase font-extrabold tracking-wider opacity-90">
                 {isStreakAchievedToday ? 'Active Days' : 'Day Streak'}
               </span>
             </div>
@@ -146,10 +209,15 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             </div>
           </div>
 
-          {/* Quick Suggested DPP Action */}
+          {/* Quick Suggested DPP Action tailored to Exam */}
           <div className="pt-2 border-t border-white/15 flex items-center justify-between text-[13px]">
             <span className="text-white/90">
-              Today's Suggested DPP: <strong className="text-white">Organic Mechanisms (38-Yr PYQs)</strong>
+              Today's Suggested DPP:{' '}
+              <strong className="text-white">
+                {targetExam === 'NEET'
+                  ? 'Botany & Organic Mechanisms (38-Yr NEET PYQs)'
+                  : 'Calculus & Rotational Dynamics (24-Yr JEE PYQs)'}
+              </strong>
             </span>
             <button
               type="button"
@@ -164,11 +232,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       </div>
 
 
-      {/* NEW: Full Mark Exam Presets (180 Qs - 720 Marks NEET / 75 Qs - 300 Marks JEE) */}
+      {/* Dynamic Full Mark Exam Presets for Selected Exam */}
       <div>
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-[14px] font-bold text-[#1a1b22] uppercase tracking-wider opacity-80">
-            FULL MARKS OFFICIAL EXAM SIMULATORS
+            {targetExam === 'NEET' ? 'NEET (UG) OFFICIAL EXAM SIMULATOR' : 'JEE MAIN OFFICIAL EXAM SIMULATOR'}
           </h3>
           <span className="text-[11px] font-bold text-[#24389c] bg-[#24389c]/10 px-2 py-0.5 rounded-full">
             Real NTA Pattern
@@ -176,79 +244,155 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {/* NEET 180 Qs - 720 Marks Card */}
-          <div className="bg-white rounded-2xl p-4 border border-[#e3e1ea] shadow-sm hover:shadow-md hover:border-[#34A853] transition-all flex flex-col justify-between">
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-[11px] font-black bg-[#34A853]/15 text-[#2e7d32] px-2.5 py-0.5 rounded-full uppercase">
-                  NEET (UG) Full Mock
-                </span>
-                <span className="text-[14px] font-black text-[#1a1b22]">
-                  720 Marks
-                </span>
+          {targetExam === 'NEET' ? (
+            <>
+              {/* NEET 180 Qs - 720 Marks Full Mock Card */}
+              <div className="bg-white rounded-2xl p-4 border border-[#34A853]/40 ring-2 ring-[#34A853]/20 shadow-sm hover:shadow-md transition-all flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-[11px] font-black bg-[#34A853]/15 text-[#2e7d32] px-2.5 py-0.5 rounded-full uppercase">
+                      NEET (UG) Full Mock
+                    </span>
+                    <span className="text-[14px] font-black text-[#2e7d32]">
+                      720 Marks
+                    </span>
+                  </div>
+                  <h4 className="text-[16px] font-black text-[#1a1b22]">
+                    180 Questions Mega Test
+                  </h4>
+                  <p className="text-[12px] text-[#454652] mt-1">
+                    45 Physics • 45 Chemistry (Physical/Org/Inorg) • 45 Botany • 45 Zoology
+                  </p>
+                </div>
+
+                <div className="mt-4 pt-3 border-t border-[#e3e1ea] flex items-center justify-between">
+                  <span className="text-[11px] font-bold text-[#6b6d7c] flex items-center gap-1">
+                    <span className="material-symbols-outlined text-[15px]">timer</span>
+                    200 Mins (+4, -1)
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => onStartFullMock('NEET')}
+                    className="px-3.5 py-1.5 rounded-xl bg-[#2e7d32] text-white text-[12px] font-bold hover:bg-[#1b5e20] transition-colors cursor-pointer flex items-center gap-1 shadow-sm"
+                  >
+                    Launch 720M Mock
+                    <span className="material-symbols-outlined text-[15px]">play_arrow</span>
+                  </button>
+                </div>
               </div>
-              <h4 className="text-[16px] font-black text-[#1a1b22]">
-                180 Questions Mega Test
-              </h4>
-              <p className="text-[12px] text-[#454652] mt-1">
-                45 Physics • 45 Chemistry (Physical/Org/Inorg) • 45 Botany • 45 Zoology
-              </p>
-            </div>
 
-            <div className="mt-4 pt-3 border-t border-[#e3e1ea] flex items-center justify-between">
-              <span className="text-[11px] font-bold text-[#6b6d7c] flex items-center gap-1">
-                <span className="material-symbols-outlined text-[15px]">timer</span>
-                200 Mins (+4, -1)
-              </span>
-              <button
-                type="button"
-                onClick={() => onStartFullMock('NEET')}
-                className="px-3.5 py-1.5 rounded-xl bg-[#2e7d32] text-white text-[12px] font-bold hover:bg-[#1b5e20] transition-colors cursor-pointer flex items-center gap-1"
-              >
-                Launch 720M
-                <span className="material-symbols-outlined text-[15px]">play_arrow</span>
-              </button>
-            </div>
-          </div>
+              {/* NEET DPP Quick 45 Card */}
+              <div className="bg-white rounded-2xl p-4 border border-[#e3e1ea] shadow-sm hover:shadow-md hover:border-[#24389c] transition-all flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-[11px] font-black bg-[#24389c]/15 text-[#24389c] px-2.5 py-0.5 rounded-full uppercase">
+                      Daily Speed DPP
+                    </span>
+                    <span className="text-[14px] font-black text-[#24389c]">
+                      180 Marks
+                    </span>
+                  </div>
+                  <h4 className="text-[16px] font-black text-[#1a1b22]">
+                    45 Questions Speed Drill
+                  </h4>
+                  <p className="text-[12px] text-[#454652] mt-1">
+                    Instant 45-minute timed test with step-by-step NCERT solutions
+                  </p>
+                </div>
 
-          {/* JEE Main Full Mock Card */}
-          <div className="bg-white rounded-2xl p-4 border border-[#e3e1ea] shadow-sm hover:shadow-md hover:border-[#24389c] transition-all flex flex-col justify-between">
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-[11px] font-black bg-[#24389c]/15 text-[#24389c] px-2.5 py-0.5 rounded-full uppercase">
-                  JEE Main Official Pattern
-                </span>
-                <span className="text-[14px] font-black text-[#24389c]">
-                  300 Full Marks
-                </span>
+                <div className="mt-4 pt-3 border-t border-[#e3e1ea] flex items-center justify-between">
+                  <span className="text-[11px] font-bold text-[#6b6d7c] flex items-center gap-1">
+                    <span className="material-symbols-outlined text-[15px]">timer</span>
+                    45 Mins (+4, -1)
+                  </span>
+                  <button
+                    type="button"
+                    onClick={onStartQuickDPP}
+                    className="px-3.5 py-1.5 rounded-xl bg-[#24389c] text-white text-[12px] font-bold hover:bg-[#1a2b7b] transition-colors cursor-pointer flex items-center gap-1 shadow-sm"
+                  >
+                    Start 45Q Drill
+                    <span className="material-symbols-outlined text-[15px]">bolt</span>
+                  </button>
+                </div>
               </div>
-              <h4 className="text-[16px] font-black text-[#1a1b22]">
-                75 Questions Mega Test
-              </h4>
-              <p className="text-[12px] text-[#454652] mt-1">
-                25 Physics (100M) • 25 Chemistry (Physical/Org/Inorg, 100M) • 25 Mathematics (100M)
-              </p>
-            </div>
+            </>
+          ) : (
+            <>
+              {/* JEE Main Full Mock Card */}
+              <div className="bg-white rounded-2xl p-4 border border-[#24389c]/40 ring-2 ring-[#24389c]/20 shadow-sm hover:shadow-md transition-all flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-[11px] font-black bg-[#24389c]/15 text-[#24389c] px-2.5 py-0.5 rounded-full uppercase">
+                      JEE Main Official Pattern
+                    </span>
+                    <span className="text-[14px] font-black text-[#24389c]">
+                      300 Full Marks
+                    </span>
+                  </div>
+                  <h4 className="text-[16px] font-black text-[#1a1b22]">
+                    75 Questions Mega Test
+                  </h4>
+                  <p className="text-[12px] text-[#454652] mt-1">
+                    25 Physics (100M) • 25 Chemistry (Physical/Org/Inorg, 100M) • 25 Mathematics (100M)
+                  </p>
+                </div>
 
-            <div className="mt-4 pt-3 border-t border-[#e3e1ea] flex items-center justify-between">
-              <span className="text-[11px] font-bold text-[#6b6d7c] flex items-center gap-1">
-                <span className="material-symbols-outlined text-[15px]">timer</span>
-                180 Mins (+4, -1)
-              </span>
-              <button
-                type="button"
-                onClick={() => onStartFullMock('JEE')}
-                className="px-3.5 py-1.5 rounded-xl bg-[#24389c] text-white text-[12px] font-bold hover:bg-[#1a2b7b] transition-colors cursor-pointer flex items-center gap-1 shadow-sm"
-              >
-                Launch 300M JEE
-                <span className="material-symbols-outlined text-[15px]">play_arrow</span>
-              </button>
-            </div>
-          </div>
+                <div className="mt-4 pt-3 border-t border-[#e3e1ea] flex items-center justify-between">
+                  <span className="text-[11px] font-bold text-[#6b6d7c] flex items-center gap-1">
+                    <span className="material-symbols-outlined text-[15px]">timer</span>
+                    180 Mins (+4, -1)
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => onStartFullMock('JEE')}
+                    className="px-3.5 py-1.5 rounded-xl bg-[#24389c] text-white text-[12px] font-bold hover:bg-[#1a2b7b] transition-colors cursor-pointer flex items-center gap-1 shadow-sm"
+                  >
+                    Launch 300M JEE
+                    <span className="material-symbols-outlined text-[15px]">play_arrow</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* JEE Speed DPP Card */}
+              <div className="bg-white rounded-2xl p-4 border border-[#e3e1ea] shadow-sm hover:shadow-md hover:border-[#6f48b2] transition-all flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-[11px] font-black bg-[#6f48b2]/15 text-[#6f48b2] px-2.5 py-0.5 rounded-full uppercase">
+                      JEE Mathematics & Physics Drill
+                    </span>
+                    <span className="text-[14px] font-black text-[#6f48b2]">
+                      120 Marks
+                    </span>
+                  </div>
+                  <h4 className="text-[16px] font-black text-[#1a1b22]">
+                    30 Questions Speed Drill
+                  </h4>
+                  <p className="text-[12px] text-[#454652] mt-1">
+                    High-yield Calculus, Algebra & Mechanics with detailed step solutions
+                  </p>
+                </div>
+
+                <div className="mt-4 pt-3 border-t border-[#e3e1ea] flex items-center justify-between">
+                  <span className="text-[11px] font-bold text-[#6b6d7c] flex items-center gap-1">
+                    <span className="material-symbols-outlined text-[15px]">timer</span>
+                    45 Mins (+4, -1)
+                  </span>
+                  <button
+                    type="button"
+                    onClick={onStartQuickDPP}
+                    className="px-3.5 py-1.5 rounded-xl bg-[#6f48b2] text-white text-[12px] font-bold hover:bg-[#572e99] transition-colors cursor-pointer flex items-center gap-1 shadow-sm"
+                  >
+                    Start Drill
+                    <span className="material-symbols-outlined text-[15px]">bolt</span>
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
         </div>
       </div>
 
-      {/* NEW: Full Syllabus PDFs & Chapter Marking Sheets Section */}
+      {/* Full Syllabus PDFs & Chapter Marking Sheets Section (Dynamically filtered for Selected Exam) */}
       <div className="bg-[#f8f9ff] rounded-2xl p-4 sm:p-5 border border-[#dee0ff]">
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
@@ -257,10 +401,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             </div>
             <div>
               <h3 className="text-[15px] font-black text-[#1a1b22]">
-                Full Subject Syllabus & Printable Marking Sheets
+                {targetExam === 'NEET' ? 'NEET (UG) Syllabus & Chapter Marking Sheets' : 'JEE Main Syllabus & Chapter Marking Sheets'}
               </h3>
               <p className="text-[12px] text-[#454652]">
-                Track NCERT chapters, record mock scores & print offline revision sheets
+                {targetExam === 'NEET'
+                  ? 'Track NCERT Physics, Chemistry, Botany & Zoology chapters'
+                  : 'Track Physics, Chemistry, Calculus, Algebra & Coordinate Geometry'}
               </p>
             </div>
           </div>
@@ -268,85 +414,129 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           <button
             type="button"
             onClick={() => onOpenSyllabusTracker('all')}
-            className="px-3 py-1.5 rounded-xl bg-[#24389c] text-white text-[12px] font-bold hover:bg-[#1a2b7b] transition-all flex items-center gap-1 shadow-xs cursor-pointer"
+            className="px-3 py-1.5 rounded-xl bg-[#24389c] text-white text-[12px] font-bold hover:bg-[#1a2b7b] transition-all flex items-center gap-1 shadow-xs cursor-pointer shrink-0"
           >
             <span className="material-symbols-outlined text-[16px]">open_in_new</span>
             Open Master Tracker
           </button>
         </div>
 
-        {/* Individual Subject Sub-Discipline Pills */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5 mt-4">
-          <button
-            type="button"
-            onClick={() => onOpenSyllabusTracker('physics')}
-            className="p-3 bg-white rounded-xl border border-[#e3e1ea] hover:border-[#24389c] hover:shadow-sm text-left transition-all cursor-pointer group"
-          >
-            <div className="text-[16px] mb-1">⚡</div>
-            <div className="text-[13px] font-bold text-[#1a1b22] group-hover:text-[#24389c]">Physics</div>
-            <div className="text-[11px] text-[#6b6d7c]">29 Chapters (11 & 12)</div>
-          </button>
+        {/* Individual Subject Sub-Discipline Pills tailored to NEET vs JEE */}
+        {targetExam === 'NEET' ? (
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 gap-2.5 mt-4">
+            <button
+              type="button"
+              onClick={() => onOpenSyllabusTracker('physics')}
+              className="p-3 bg-white rounded-xl border border-[#e3e1ea] hover:border-[#24389c] hover:shadow-sm text-left transition-all cursor-pointer group"
+            >
+              <div className="text-[16px] mb-1">⚡</div>
+              <div className="text-[13px] font-bold text-[#1a1b22] group-hover:text-[#24389c]">Physics</div>
+              <div className="text-[11px] text-[#6b6d7c]">29 Chapters (11 & 12)</div>
+            </button>
 
-          <button
-            type="button"
-            onClick={() => onOpenSyllabusTracker('chemistry_physical')}
-            className="p-3 bg-white rounded-xl border border-[#e3e1ea] hover:border-[#24389c] hover:shadow-sm text-left transition-all cursor-pointer group"
-          >
-            <div className="text-[16px] mb-1">🧪</div>
-            <div className="text-[13px] font-bold text-[#1a1b22] group-hover:text-[#24389c]">Physical Chem</div>
-            <div className="text-[11px] text-[#6b6d7c]">8 Chapters</div>
-          </button>
+            <button
+              type="button"
+              onClick={() => onOpenSyllabusTracker('chemistry_physical')}
+              className="p-3 bg-white rounded-xl border border-[#e3e1ea] hover:border-[#24389c] hover:shadow-sm text-left transition-all cursor-pointer group"
+            >
+              <div className="text-[16px] mb-1">🧪</div>
+              <div className="text-[13px] font-bold text-[#1a1b22] group-hover:text-[#24389c]">Physical Chem</div>
+              <div className="text-[11px] text-[#6b6d7c]">8 Chapters</div>
+            </button>
 
-          <button
-            type="button"
-            onClick={() => onOpenSyllabusTracker('chemistry_inorganic')}
-            className="p-3 bg-white rounded-xl border border-[#e3e1ea] hover:border-[#24389c] hover:shadow-sm text-left transition-all cursor-pointer group"
-          >
-            <div className="text-[16px] mb-1">🔬</div>
-            <div className="text-[13px] font-bold text-[#1a1b22] group-hover:text-[#24389c]">Inorganic Chem</div>
-            <div className="text-[11px] text-[#6b6d7c]">7 Chapters</div>
-          </button>
+            <button
+              type="button"
+              onClick={() => onOpenSyllabusTracker('chemistry_inorganic')}
+              className="p-3 bg-white rounded-xl border border-[#e3e1ea] hover:border-[#24389c] hover:shadow-sm text-left transition-all cursor-pointer group"
+            >
+              <div className="text-[16px] mb-1">🔬</div>
+              <div className="text-[13px] font-bold text-[#1a1b22] group-hover:text-[#24389c]">Inorganic Chem</div>
+              <div className="text-[11px] text-[#6b6d7c]">7 Chapters</div>
+            </button>
 
-          <button
-            type="button"
-            onClick={() => onOpenSyllabusTracker('chemistry_organic')}
-            className="p-3 bg-white rounded-xl border border-[#e3e1ea] hover:border-[#24389c] hover:shadow-sm text-left transition-all cursor-pointer group"
-          >
-            <div className="text-[16px] mb-1">⚗️</div>
-            <div className="text-[13px] font-bold text-[#1a1b22] group-hover:text-[#24389c]">Organic Chem</div>
-            <div className="text-[11px] text-[#6b6d7c]">7 Chapters</div>
-          </button>
+            <button
+              type="button"
+              onClick={() => onOpenSyllabusTracker('chemistry_organic')}
+              className="p-3 bg-white rounded-xl border border-[#e3e1ea] hover:border-[#24389c] hover:shadow-sm text-left transition-all cursor-pointer group"
+            >
+              <div className="text-[16px] mb-1">⚗️</div>
+              <div className="text-[13px] font-bold text-[#1a1b22] group-hover:text-[#24389c]">Organic Chem</div>
+              <div className="text-[11px] text-[#6b6d7c]">7 Chapters</div>
+            </button>
 
-          <button
-            type="button"
-            onClick={() => onOpenSyllabusTracker('biology_botany')}
-            className="p-3 bg-white rounded-xl border border-[#e3e1ea] hover:border-[#2e7d32] hover:shadow-sm text-left transition-all cursor-pointer group"
-          >
-            <div className="text-[16px] mb-1">🌿</div>
-            <div className="text-[13px] font-bold text-[#1a1b22] group-hover:text-[#2e7d32]">Botany (NEET)</div>
-            <div className="text-[11px] text-[#6b6d7c]">17 Chapters</div>
-          </button>
+            <button
+              type="button"
+              onClick={() => onOpenSyllabusTracker('biology_botany')}
+              className="p-3 bg-white rounded-xl border border-[#e3e1ea] hover:border-[#2e7d32] hover:shadow-sm text-left transition-all cursor-pointer group"
+            >
+              <div className="text-[16px] mb-1">🌿</div>
+              <div className="text-[13px] font-bold text-[#1a1b22] group-hover:text-[#2e7d32]">Botany (NEET)</div>
+              <div className="text-[11px] text-[#6b6d7c]">17 Chapters</div>
+            </button>
 
-          <button
-            type="button"
-            onClick={() => onOpenSyllabusTracker('biology_zoology')}
-            className="p-3 bg-white rounded-xl border border-[#e3e1ea] hover:border-[#2e7d32] hover:shadow-sm text-left transition-all cursor-pointer group"
-          >
-            <div className="text-[16px] mb-1">🐾</div>
-            <div className="text-[13px] font-bold text-[#1a1b22] group-hover:text-[#2e7d32]">Zoology (NEET)</div>
-            <div className="text-[11px] text-[#6b6d7c]">15 Chapters</div>
-          </button>
+            <button
+              type="button"
+              onClick={() => onOpenSyllabusTracker('biology_zoology')}
+              className="p-3 bg-white rounded-xl border border-[#e3e1ea] hover:border-[#2e7d32] hover:shadow-sm text-left transition-all cursor-pointer group"
+            >
+              <div className="text-[16px] mb-1">🐾</div>
+              <div className="text-[13px] font-bold text-[#1a1b22] group-hover:text-[#2e7d32]">Zoology (NEET)</div>
+              <div className="text-[11px] text-[#6b6d7c]">15 Chapters</div>
+            </button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2.5 mt-4">
+            <button
+              type="button"
+              onClick={() => onOpenSyllabusTracker('physics')}
+              className="p-3 bg-white rounded-xl border border-[#e3e1ea] hover:border-[#24389c] hover:shadow-sm text-left transition-all cursor-pointer group"
+            >
+              <div className="text-[16px] mb-1">⚡</div>
+              <div className="text-[13px] font-bold text-[#1a1b22] group-hover:text-[#24389c]">Physics</div>
+              <div className="text-[11px] text-[#6b6d7c]">29 Chapters</div>
+            </button>
 
-          <button
-            type="button"
-            onClick={() => onOpenSyllabusTracker('mathematics')}
-            className="p-3 bg-white rounded-xl border border-[#e3e1ea] hover:border-[#24389c] hover:shadow-sm text-left transition-all cursor-pointer group col-span-2 sm:col-span-1 md:col-span-2"
-          >
-            <div className="text-[16px] mb-1">📐</div>
-            <div className="text-[13px] font-bold text-[#1a1b22] group-hover:text-[#24389c]">Mathematics (JEE)</div>
-            <div className="text-[11px] text-[#6b6d7c]">23 Chapters • Calculus & Algebra</div>
-          </button>
-        </div>
+            <button
+              type="button"
+              onClick={() => onOpenSyllabusTracker('chemistry_physical')}
+              className="p-3 bg-white rounded-xl border border-[#e3e1ea] hover:border-[#24389c] hover:shadow-sm text-left transition-all cursor-pointer group"
+            >
+              <div className="text-[16px] mb-1">🧪</div>
+              <div className="text-[13px] font-bold text-[#1a1b22] group-hover:text-[#24389c]">Physical Chem</div>
+              <div className="text-[11px] text-[#6b6d7c]">8 Chapters</div>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => onOpenSyllabusTracker('chemistry_inorganic')}
+              className="p-3 bg-white rounded-xl border border-[#e3e1ea] hover:border-[#24389c] hover:shadow-sm text-left transition-all cursor-pointer group"
+            >
+              <div className="text-[16px] mb-1">🔬</div>
+              <div className="text-[13px] font-bold text-[#1a1b22] group-hover:text-[#24389c]">Inorganic Chem</div>
+              <div className="text-[11px] text-[#6b6d7c]">7 Chapters</div>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => onOpenSyllabusTracker('chemistry_organic')}
+              className="p-3 bg-white rounded-xl border border-[#e3e1ea] hover:border-[#24389c] hover:shadow-sm text-left transition-all cursor-pointer group"
+            >
+              <div className="text-[16px] mb-1">⚗️</div>
+              <div className="text-[13px] font-bold text-[#1a1b22] group-hover:text-[#24389c]">Organic Chem</div>
+              <div className="text-[11px] text-[#6b6d7c]">7 Chapters</div>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => onOpenSyllabusTracker('mathematics')}
+              className="p-3 bg-white rounded-xl border border-[#24389c]/40 ring-1 ring-[#24389c]/20 hover:border-[#24389c] hover:shadow-sm text-left transition-all cursor-pointer group col-span-2 sm:col-span-1 md:col-span-1"
+            >
+              <div className="text-[16px] mb-1">📐</div>
+              <div className="text-[13px] font-bold text-[#24389c] group-hover:text-[#1a2b7b]">Mathematics</div>
+              <div className="text-[11px] text-[#6b6d7c]">23 Chapters (JEE)</div>
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Quick Practice Cards */}
@@ -365,7 +555,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             </div>
             <h4 className="text-[15px] font-bold text-[#1a1b22]">Custom Test Designer</h4>
             <p className="text-[12px] text-[#454652] mt-0.5">
-              Design by chapter, difficulty, timing & custom question mix
+              Design by chapter, difficulty, timing & custom question mix ({targetExam})
             </p>
           </button>
 
@@ -413,23 +603,23 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           </button>
         </div>
 
-        {/* 2-Column Stats Grid */}
+        {/* Visual Metric Counter Strip */}
         <div className="grid grid-cols-2 gap-3 mb-4">
           <div className="bg-[#f8f9ff] p-3.5 rounded-2xl border border-[#dee0ff]">
-            <span className="text-[11px] font-bold text-[#454652] block uppercase tracking-wider">
-              Today's Focus Time
+            <span className="text-[11px] font-extrabold uppercase text-[#24389c] tracking-wider block">
+              Today's Logged Time
             </span>
-            <span className="text-[20px] font-black text-[#24389c] block mt-0.5">
+            <span className="text-[20px] font-black text-[#1a1b22] flex items-center gap-1 mt-0.5 font-mono">
               {formatHoursMins(todayStudySeconds)}
             </span>
-            <span className="text-[11px] text-[#6b6d7c] font-medium block mt-0.5">
-              Target: 4 Hours / Day
+            <span className="text-[11px] font-semibold text-[#585966] block mt-0.5">
+              Target: 4h 00m (Daily Goal)
             </span>
           </div>
 
-          <div className="bg-[#fdfaf2] p-3.5 rounded-2xl border border-[#fae5b8]">
-            <span className="text-[11px] font-bold text-amber-800 block uppercase tracking-wider">
-              Streak Status
+          <div className="bg-[#fff8f0] p-3.5 rounded-2xl border border-[#ffe0b2]">
+            <span className="text-[11px] font-extrabold uppercase text-amber-700 tracking-wider block">
+              Verified Day Streak
             </span>
             <span className="text-[20px] font-black text-amber-600 flex items-center gap-1 mt-0.5">
               🔥 {currentStreakDays} Days
@@ -531,96 +721,106 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       <div>
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-[14px] font-bold text-[#1a1b22] uppercase tracking-wider opacity-80">
-            RECENT TESTS
+            RECENT TEST PERFORMANCES
           </h3>
           <button
             type="button"
-            onClick={onOpenTestResultsDemo}
-            className="text-[12px] font-bold text-[#24389c] hover:underline"
+            onClick={onNavigateToTests}
+            className="text-[12px] font-bold text-[#24389c] hover:underline cursor-pointer"
           >
-            View Latest Report
+            Create New Test
           </button>
         </div>
 
-        <div className="space-y-3">
-          <div
-            onClick={onOpenTestResultsDemo}
-            className="bg-white rounded-2xl p-4 border border-[#e3e1ea] shadow-sm hover:shadow-md transition-all cursor-pointer flex items-center justify-between"
-          >
-            <div className="flex items-center gap-3.5">
-              <div className="w-11 h-11 rounded-xl bg-[#34A853]/15 text-[#34A853] flex items-center justify-center font-extrabold text-[15px]">
-                92%
-              </div>
-              <div>
-                <h4 className="text-[15px] font-bold text-[#1a1b22]">
-                  NEET Full Mock Test (720 Marks)
-                </h4>
-                <p className="text-[12px] text-[#454652]">
-                  Phy, Chem, Botany, Zoology • 180 Questions
-                </p>
-              </div>
-            </div>
+        {recentTests.length > 0 ? (
+          <div className="space-y-3">
+            {recentTests.map((t) => (
+              <div
+                key={t.id}
+                onClick={onNavigateToTests}
+                className="bg-white rounded-2xl p-4 border border-[#e3e1ea] shadow-sm hover:shadow-md transition-all cursor-pointer flex items-center justify-between"
+              >
+                <div className="flex items-center gap-3.5">
+                  <div className={`w-11 h-11 rounded-xl flex items-center justify-center font-extrabold text-[15px] ${
+                    t.accuracyPercent >= 80
+                      ? 'bg-[#34A853]/15 text-[#34A853]'
+                      : t.accuracyPercent >= 50
+                      ? 'bg-[#24389c]/15 text-[#24389c]'
+                      : 'bg-amber-500/15 text-amber-600'
+                  }`}>
+                    {t.accuracyPercent}%
+                  </div>
+                  <div>
+                    <h4 className="text-[15px] font-bold text-[#1a1b22]">
+                      {t.exam} {t.format.toUpperCase()} Practice Test
+                    </h4>
+                    <p className="text-[12px] text-[#454652]">
+                      {t.attemptedCount}/{t.totalQuestions} Attempted • {t.dateFormatted}
+                    </p>
+                  </div>
+                </div>
 
-            <div className="text-right">
-              <span className="text-[16px] font-extrabold text-[#24389c] block">
-                680/720
-              </span>
-              <span className="text-[11px] font-semibold text-[#6f48b2]">
-                99.4 Percentile
-              </span>
-            </div>
+                <div className="text-right">
+                  <span className="text-[16px] font-extrabold text-[#24389c] block font-mono">
+                    {t.totalScore}/{t.maxScore}
+                  </span>
+                  <span className="text-[11px] font-semibold text-[#34A853]">
+                    {t.correctCount} Correct
+                  </span>
+                </div>
+              </div>
+            ))}
           </div>
-
-          <div
-            onClick={onOpenTestResultsDemo}
-            className="bg-white rounded-2xl p-4 border border-[#e3e1ea] shadow-sm hover:shadow-md transition-all cursor-pointer flex items-center justify-between"
-          >
-            <div className="flex items-center gap-3.5">
-              <div className="w-11 h-11 rounded-xl bg-[#24389c]/15 text-[#24389c] flex items-center justify-center font-extrabold text-[15px]">
-                88%
-              </div>
-              <div>
-                <h4 className="text-[15px] font-bold text-[#1a1b22]">
-                  Kinematics & Thermodynamics DPP
-                </h4>
-                <p className="text-[12px] text-[#454652]">
-                  PYQ Mix • 30 Questions
-                </p>
-              </div>
+        ) : (
+          <div className="bg-white rounded-2xl p-5 border border-dashed border-[#d2d0db] text-center space-y-2">
+            <div className="w-10 h-10 rounded-xl bg-blue-50 text-[#24389c] flex items-center justify-center mx-auto text-[20px]">
+              📝
             </div>
-
-            <div className="text-right">
-              <span className="text-[16px] font-extrabold text-[#24389c] block">
-                108/120
-              </span>
-              <span className="text-[11px] font-semibold text-[#34A853]">
-                Completed Yesterday
-              </span>
-            </div>
+            <p className="text-[14px] font-bold text-[#1a1b22]">No Tests Completed Yet</p>
+            <p className="text-[12px] text-[#585966] max-w-sm mx-auto">
+              Start your first timed Daily Practice Problem or Mock Test in {targetExam} to track your score history and question accuracy!
+            </p>
+            <button
+              type="button"
+              onClick={onStartQuickDPP}
+              className="mt-2 px-4 py-2 rounded-xl bg-[#24389c] text-white text-[12px] font-bold hover:bg-[#1a2b7b] transition-all shadow-xs cursor-pointer inline-flex items-center gap-1.5"
+            >
+              <span className="material-symbols-outlined text-[16px]">bolt</span>
+              Start First {targetExam} DPP (45 Qs)
+            </button>
           </div>
-        </div>
+        )}
       </div>
 
-      {/* Weak Areas Recommendation */}
+      {/* Weak Areas Recommendation tailored to Exam */}
       <div className="bg-[#f4f2fc] rounded-2xl p-4 border border-[#e3e1ea]">
         <div className="flex items-center gap-2 mb-2">
           <span className="material-symbols-outlined text-[#6f48b2] text-[20px]">
             auto_awesome
           </span>
           <h4 className="text-[14px] font-bold text-[#1a1b22]">
-            AI Weakness Radar
+            AI Weakness Radar ({targetExam})
           </h4>
         </div>
         <p className="text-[13px] text-[#454652] leading-relaxed">
-          You missed questions in <strong className="text-[#1a1b22]">Coordination Complexes</strong> and{' '}
-          <strong className="text-[#1a1b22]">Circular Motion Acceleration</strong>. We recommend a 15-min targeted drill.
+          {targetExam === 'NEET' ? (
+            <>
+              Identified high-yield focus areas in <strong className="text-[#1a1b22]">Coordination Compounds</strong> and{' '}
+              <strong className="text-[#1a1b22]">Cell Cycle & Mitosis (Botany/Zoology)</strong>. We recommend a 15-min targeted drill.
+            </>
+          ) : (
+            <>
+              Identified high-yield focus areas in <strong className="text-[#1a1b22]">Definite Integrals (Calculus)</strong> and{' '}
+              <strong className="text-[#1a1b22]">Rotational Dynamics & Torque (Physics)</strong>. We recommend a 15-min targeted drill.
+            </>
+          )}
         </p>
         <button
           type="button"
           onClick={onStartQuickDPP}
-          className="mt-3 w-full py-2.5 rounded-xl bg-[#6f48b2] text-white text-[13px] font-bold hover:bg-[#572e99] transition-colors"
+          className="mt-3 w-full py-2.5 rounded-xl bg-[#6f48b2] text-white text-[13px] font-bold hover:bg-[#572e99] transition-colors cursor-pointer"
         >
-          Practice Weak Areas Now
+          Practice {targetExam} Weak Areas Now
         </button>
       </div>
 

@@ -9,7 +9,17 @@ interface SyllabusTrackerModalProps {
   onStartChapterTest?: (chapterId: string) => void;
 }
 
-const STORAGE_KEY = 'preppulse_syllabus_tracker_v1';
+const STORAGE_KEY = 'preppulse_syllabus_tracker_v3';
+
+export function clearSyllabusTrackerStorage(): void {
+  try {
+    localStorage.removeItem('preppulse_syllabus_tracker_v1');
+    localStorage.removeItem('preppulse_syllabus_tracker_v2');
+    localStorage.removeItem('preppulse_syllabus_tracker_v3');
+  } catch {
+    // ignore
+  }
+}
 
 export const SyllabusTrackerModal: React.FC<SyllabusTrackerModalProps> = ({
   isOpen,

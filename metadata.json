@@ -2,6 +2,7 @@
   "name": "PrepPulse",
   "description": "Adaptive test design and practice platform for NEET (720M) and JEE Main/Advanced (300M) with official pattern mega mocks, daily speed drills, 4-hour daily streak tracker, syllabus completion tracking, and study timetable maker.",
   "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
 }
-

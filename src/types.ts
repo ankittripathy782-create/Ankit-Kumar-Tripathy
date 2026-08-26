@@ -172,4 +172,20 @@ export interface TimetableTemplate {
   slots: Omit<TimetableSlot, 'id' | 'isCompleted'>[];
 }
 
+export interface UserProfile {
+  id: string;
+  name: string;
+  email: string;
+  avatarUrl: string;
+  targetExam: 'NEET' | 'JEE';
+  targetYear: number;
+  dailyGoalQuestions: number;
+  dailyStudyTargetHours: number;
+  phone?: string;
+  dreamCollege?: string;
+  bio?: string;
+  isLoggedIn: boolean;
+  joinedDate: string;
+}
+
 

@@ -1,9 +1,22 @@
 import { DayStudyRecord, StreakTrackerState, StudySessionLog } from '../types';
 
-const STORAGE_KEY = 'preppulse_study_streak_state_v1';
+const STORAGE_KEY = 'preppulse_study_streak_state_v3';
 
 // 4 Hours in seconds = 4 * 3600 = 14400
 export const STREAK_THRESHOLD_SECONDS = 14400;
+
+export function clearAllStudyStorage(): StreakTrackerState {
+  try {
+    localStorage.removeItem('preppulse_study_streak_state_v1');
+    localStorage.removeItem('preppulse_study_streak_state_v2');
+    localStorage.removeItem('preppulse_study_streak_state_v3');
+  } catch {
+    // ignore
+  }
+  const fresh = getInitialDefaultStudyState();
+  saveStudyTrackerState(fresh);
+  return fresh;
+}
 
 export function getTodayDateString(): string {
   const now = new Date();
@@ -22,13 +35,14 @@ export function formatSecondsToDigital(totalSeconds: number): string {
 }
 
 export function formatHoursAndMinutes(totalSeconds: number): string {
+  if (totalSeconds === 0) return '0h 00m';
   const hrs = Math.floor(totalSeconds / 3600);
   const mins = Math.floor((totalSeconds % 3600) / 60);
   
   if (hrs === 0 && mins === 0) return `${totalSeconds}s`;
   if (hrs === 0) return `${mins}m`;
-  if (mins === 0) return `${hrs}h`;
-  return `${hrs}h ${mins}m`;
+  if (mins === 0) return `${hrs}h 00m`;
+  return `${hrs}h ${mins < 10 ? '0' + mins : mins}m`;
 }
 
 export function getInitialDefaultStudyState(): StreakTrackerState {
@@ -36,82 +50,29 @@ export function getInitialDefaultStudyState(): StreakTrackerState {
   const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
   const todayDateObj = new Date();
   
-  // Generate past 6 days history (all >= 4 hours so user has an authentic 7-day streak base)
+  // Clean weekly history: all initialized to 0 seconds (user must start timer to accumulate time)
   const weeklyHistory: DayStudyRecord[] = [];
-  for (let i = 6; i >= 1; i--) {
+  for (let i = 6; i >= 0; i--) {
     const d = new Date(todayDateObj);
     d.setDate(d.getDate() - i);
     const dateStr = d.toISOString().split('T')[0];
     const dayLabel = dayNames[d.getDay()];
-    // 4.2 to 5.1 hours
-    const seconds = 15000 + (i * 720) % 3600;
     weeklyHistory.push({
       date: dateStr,
       dayLabel,
-      totalSeconds: seconds,
-      isStreakAchieved: true,
-      sessions: [
-        {
-          id: `past-session-${i}-1`,
-          timestamp: d.toISOString(),
-          subject: i % 2 === 0 ? 'Physics' : 'Organic Chemistry',
-          topic: 'Mechanisms & PYQs',
-          durationSeconds: Math.floor(seconds * 0.6),
-          mode: 'stopwatch'
-        },
-        {
-          id: `past-session-${i}-2`,
-          timestamp: d.toISOString(),
-          subject: i % 3 === 0 ? 'Botany' : 'Mathematics',
-          topic: 'NCERT In-depth Practice',
-          durationSeconds: Math.floor(seconds * 0.4),
-          mode: 'pomodoro'
-        }
-      ]
+      totalSeconds: 0,
+      isStreakAchieved: false,
+      sessions: []
     });
   }
 
-  // Today initial state: 2 Hours 15 Mins (8100 seconds)
-  // Needs 1h 45m more to complete the 4-hour streak!
-  const todayInitialSeconds = 8100;
-  const todayLabel = dayNames[todayDateObj.getDay()];
-  
-  const todayRecord: DayStudyRecord = {
-    date: today,
-    dayLabel: todayLabel,
-    totalSeconds: todayInitialSeconds,
-    isStreakAchieved: todayInitialSeconds >= STREAK_THRESHOLD_SECONDS,
-    sessions: [
-      {
-        id: 'today-session-1',
-        timestamp: new Date(Date.now() - 3600000 * 3).toISOString(),
-        subject: 'Botany & Zoology',
-        topic: 'Plant Physiology & Genetics Revisions',
-        durationSeconds: 4800,
-        mode: 'pomodoro'
-      },
-      {
-        id: 'today-session-2',
-        timestamp: new Date(Date.now() - 3600000).toISOString(),
-        subject: 'Physical Chemistry',
-        topic: 'Chemical Equilibrium & Kinetics',
-        durationSeconds: 3300,
-        mode: 'stopwatch'
-      }
-    ]
-  };
-
-  weeklyHistory.push(todayRecord);
-
-  const pastTotalSeconds = weeklyHistory.slice(0, 6).reduce((acc, cur) => acc + cur.totalSeconds, 0);
-
   return {
-    currentStreakDays: 7, // 7 consecutive days completed
-    todaySeconds: todayInitialSeconds,
+    currentStreakDays: 0,
+    todaySeconds: 0,
     streakThresholdSeconds: STREAK_THRESHOLD_SECONDS,
-    isStreakAchievedToday: todayInitialSeconds >= STREAK_THRESHOLD_SECONDS,
+    isStreakAchievedToday: false,
     weeklyHistory,
-    allTimeStudySeconds: pastTotalSeconds + todayInitialSeconds + 3600 * 85 // + historical total
+    allTimeStudySeconds: 0
   };
 }
 
@@ -142,7 +103,7 @@ export function loadStudyTrackerState(): StreakTrackerState {
         sessions: []
       };
       
-      // Update streak: if yesterday was not achieved, reset or adjust
+      // Update streak: if yesterday was achieved, keep streak; otherwise 0
       const yesterdayAchieved = lastRecord ? lastRecord.isStreakAchieved : false;
       const updatedStreak = yesterdayAchieved ? parsed.currentStreakDays : 0;
       
@@ -163,6 +124,32 @@ export function loadStudyTrackerState(): StreakTrackerState {
   } catch {
     return getInitialDefaultStudyState();
   }
+}
+
+export function resetTodayStudyTime(): StreakTrackerState {
+  const state = loadStudyTrackerState();
+  const today = getTodayDateString();
+  const updatedHistory = state.weeklyHistory.map((day) => {
+    if (day.date === today) {
+      return {
+        ...day,
+        totalSeconds: 0,
+        isStreakAchieved: false,
+        sessions: []
+      };
+    }
+    return day;
+  });
+
+  const updatedState: StreakTrackerState = {
+    ...state,
+    todaySeconds: 0,
+    isStreakAchievedToday: false,
+    weeklyHistory: updatedHistory
+  };
+
+  saveStudyTrackerState(updatedState);
+  return updatedState;
 }
 
 export function saveStudyTrackerState(state: StreakTrackerState): void {
