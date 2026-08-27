@@ -69,6 +69,28 @@ export default function App() {
     });
   };
 
+  // Switch between NEET and JEE target exam preference
+  const handleSelectExam = (exam: 'NEET' | 'JEE') => {
+    const updated: UserProfile = {
+      ...userProfile,
+      targetExam: exam,
+      dreamCollege: userProfile.dreamCollege || (exam === 'NEET' ? 'AIIMS New Delhi' : 'IIT Bombay'),
+    };
+    setUserProfile(updated);
+    saveUserProfile(updated);
+    setCelebrationData({
+      id: `exam-switch-${Date.now()}`,
+      title: exam === 'NEET' ? '🩺 NEET Medical Prep Active!' : '📐 JEE Engineering Prep Active!',
+      message: exam === 'NEET'
+        ? 'Targeting 720 Marks with Physics, Chemistry, Botany & Zoology!'
+        : 'Targeting 300 Marks with Physics, Chemistry & Mathematics!',
+      addedTimeFormatted: exam,
+      totalTimeFormatted: `${exam} Mode`,
+      isStreakUnlocked: trackerState.isStreakAchievedToday,
+      streakDays: trackerState.currentStreakDays,
+    });
+  };
+
   const handleResetStudyTime = () => {
     const updated = resetTodayStudyTime();
     setTrackerState(updated);
@@ -532,6 +554,8 @@ export default function App() {
         todayStudySeconds={trackerState.todaySeconds + sessionSeconds}
         isStreakAchievedToday={trackerState.isStreakAchievedToday || (trackerState.todaySeconds + sessionSeconds >= STREAK_THRESHOLD_SECONDS)}
         userProfile={userProfile}
+        selectedExam={userProfile.targetExam}
+        onSelectExam={handleSelectExam}
       />
 
       {/* Main Content Area with safe spacing */}
@@ -551,7 +575,11 @@ export default function App() {
             onBack={handleBackFromResults}
           />
         ) : currentTab === 'tests' ? (
-          <TestDesigner onStartTest={handleStartTest} />
+          <TestDesigner
+            onStartTest={handleStartTest}
+            initialExam={userProfile.targetExam}
+            onExamChange={handleSelectExam}
+          />
         ) : currentTab === 'home' ? (
           <HomeScreen
             onStartQuickDPP={handleStartQuickDPP}
@@ -573,6 +601,8 @@ export default function App() {
               (trackerState.todaySeconds + sessionSeconds >= STREAK_THRESHOLD_SECONDS)
             }
             userProfile={userProfile}
+            selectedExam={userProfile.targetExam}
+            onSelectExam={handleSelectExam}
             onOpenLoginModal={() => setIsLoginModalOpen(true)}
           />
 
@@ -697,6 +727,8 @@ export default function App() {
         isOpen={isSyllabusTrackerOpen}
         onClose={() => setIsSyllabusTrackerOpen(false)}
         initialCategory={initialTrackerCategory}
+        selectedExam={userProfile.targetExam}
+        userProfile={userProfile}
       />
     </div>
   );

@@ -56,10 +56,6 @@ export const LoginProfileModal: React.FC<LoginProfileModalProps> = ({
       setErrorMessage('Please enter your full name.');
       return;
     }
-    if (!email.trim()) {
-      setErrorMessage('Please enter a valid email address.');
-      return;
-    }
 
     const updatedProfile: UserProfile = {
       ...currentProfile,
@@ -205,14 +201,13 @@ export const LoginProfileModal: React.FC<LoginProfileModalProps> = ({
 
             <div>
               <label className="text-[12px] font-bold text-[#1a1b22] block mb-1.5">
-                Email Address <span className="text-red-500">*</span>
+                Email Address <span className="text-gray-400 font-normal">(Optional)</span>
               </label>
               <input
                 type="email"
-                required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="e.g. ankittripathy782@gmail.com"
+                placeholder="e.g. aspirant@example.com"
                 className="w-full bg-white border border-[#e3e1ea] rounded-xl px-3.5 py-2.5 text-[14px] font-semibold text-[#1a1b22] focus:outline-none focus:border-[#24389c]"
               />
             </div>

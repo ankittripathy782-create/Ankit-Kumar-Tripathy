@@ -49,8 +49,8 @@ export const PRESET_AVATARS = [
 
 export const DEFAULT_USER_PROFILE: UserProfile = {
   id: 'user-default-1',
-  name: 'Ankit Kumar Tripathy',
-  email: 'ankittripathy782@gmail.com',
+  name: 'Scholar Aspirant',
+  email: '',
   avatarUrl: PRESET_AVATARS[0].url,
   targetExam: 'NEET',
   targetYear: 2026,
@@ -70,7 +70,12 @@ export function loadUserProfile(): UserProfile {
       return DEFAULT_USER_PROFILE;
     }
     const parsed: UserProfile = JSON.parse(raw);
-    return parsed;
+    // Sanitize any initial/legacy auto-filled personal email address
+    if (parsed.email === 'ankittripathy782@gmail.com') {
+      parsed.email = '';
+      saveUserProfile({ ...DEFAULT_USER_PROFILE, ...parsed, email: '' });
+    }
+    return { ...DEFAULT_USER_PROFILE, ...parsed };
   } catch {
     return DEFAULT_USER_PROFILE;
   }

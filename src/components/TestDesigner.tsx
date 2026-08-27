@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { ExamType, TestFormat, QuestionMix, DifficultyLevel, TestConfig, Chapter } from '../types';
 import { FULL_SYLLABUS_DATA } from '../data/syllabus';
 
@@ -6,14 +6,25 @@ interface TestDesignerProps {
   onStartTest: (config: TestConfig) => void;
   initialExam?: ExamType;
   initialQuestionCount?: number;
+  onExamChange?: (exam: ExamType) => void;
 }
 
 export const TestDesigner: React.FC<TestDesignerProps> = ({
   onStartTest,
   initialExam = 'NEET',
   initialQuestionCount = 45,
+  onExamChange,
 }) => {
   const [exam, setExam] = useState<ExamType>(initialExam);
+
+  useEffect(() => {
+    if (initialExam && initialExam !== exam) {
+      setExam(initialExam);
+      setSelectedChapters({});
+      setQuestionsCount(initialExam === 'NEET' ? 45 : 75);
+      setTimeLimitMinutes(initialExam === 'NEET' ? 45 : 180);
+    }
+  }, [initialExam]);
   const [format, setFormat] = useState<TestFormat>(initialQuestionCount >= 90 ? 'mock' : 'dpp');
   const [questionMix, setQuestionMix] = useState<QuestionMix>('balanced');
   const [difficulty, setDifficulty] = useState<DifficultyLevel>('adaptive');
@@ -268,6 +279,8 @@ export const TestDesigner: React.FC<TestDesignerProps> = ({
                 setExam('NEET');
                 setSelectedChapters({});
                 setQuestionsCount(45);
+                setTimeLimitMinutes(45);
+                onExamChange?.('NEET');
               }}
               className={`relative z-10 flex-1 py-3 text-[14px] font-extrabold text-center rounded-xl transition-colors cursor-pointer ${
                 exam === 'NEET' ? 'text-white' : 'text-[#454652] hover:text-[#1a1b22]'
@@ -281,6 +294,8 @@ export const TestDesigner: React.FC<TestDesignerProps> = ({
                 setExam('JEE');
                 setSelectedChapters({});
                 setQuestionsCount(75);
+                setTimeLimitMinutes(180);
+                onExamChange?.('JEE');
               }}
               className={`relative z-10 flex-1 py-3 text-[14px] font-extrabold text-center rounded-xl transition-colors cursor-pointer ${
                 exam === 'JEE' ? 'text-white' : 'text-[#454652] hover:text-[#1a1b22]'

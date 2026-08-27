@@ -74,9 +74,15 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
               </span>
             </div>
 
-            <p className="text-[13px] text-[#585966] font-medium truncate mt-0.5">
-              {userProfile.email}
-            </p>
+            {userProfile.email ? (
+              <p className="text-[13px] text-[#585966] font-medium truncate mt-0.5">
+                {userProfile.email}
+              </p>
+            ) : (
+              <p className="text-[13px] text-[#585966] font-medium truncate mt-0.5">
+                Targeting: {userProfile.targetExam === 'NEET' ? 'NEET (UG) Medical' : 'JEE Main & Advanced'}
+              </p>
+            )}
 
             {userProfile.dreamCollege && (
               <p className="text-[12px] text-[#24389c] font-bold truncate mt-0.5 flex items-center gap-1">

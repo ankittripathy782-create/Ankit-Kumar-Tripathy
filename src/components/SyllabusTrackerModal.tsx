@@ -1,11 +1,14 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Chapter, ChapterProgress, SubSubject, SubjectId } from '../types';
+import { Chapter, ChapterProgress, ExamType, SubSubject, SubjectId, UserProfile } from '../types';
 import { FULL_SYLLABUS_DATA } from '../data/syllabus';
 
 interface SyllabusTrackerModalProps {
   isOpen: boolean;
   onClose: () => void;
   initialSubject?: string;
+  initialCategory?: string;
+  selectedExam?: ExamType;
+  userProfile?: UserProfile;
   onStartChapterTest?: (chapterId: string) => void;
 }
 
@@ -25,14 +28,19 @@ export const SyllabusTrackerModal: React.FC<SyllabusTrackerModalProps> = ({
   isOpen,
   onClose,
   initialSubject = 'all',
+  initialCategory,
+  selectedExam = 'NEET',
+  userProfile,
   onStartChapterTest,
 }) => {
-  const [activeTab, setActiveTab] = useState<string>(initialSubject);
+  const [activeTab, setActiveTab] = useState<string>(initialCategory || initialSubject || 'all');
   const [classFilter, setClassFilter] = useState<'All' | 'Class 11' | 'Class 12'>('All');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [printMode, setPrintMode] = useState<boolean>(false);
-  const [studentName, setStudentName] = useState<string>('Ankit Sharma');
-  const [targetExam, setTargetExam] = useState<'NEET (UG)' | 'JEE MAIN' | 'NEET & JEE'>('NEET & JEE');
+  const [studentName, setStudentName] = useState<string>(userProfile?.name || 'Scholar Aspirant');
+  const [targetExam, setTargetExam] = useState<'NEET (UG)' | 'JEE MAIN' | 'NEET & JEE'>(
+    selectedExam === 'NEET' ? 'NEET (UG)' : selectedExam === 'JEE' ? 'JEE MAIN' : 'NEET & JEE'
+  );
 
   // Load progress from localStorage
   const [progressMap, setProgressMap] = useState<Record<string, ChapterProgress>>(() => {
@@ -46,6 +54,18 @@ export const SyllabusTrackerModal: React.FC<SyllabusTrackerModalProps> = ({
   });
 
   useEffect(() => {
+    if (userProfile?.name) {
+      setStudentName(userProfile.name);
+    }
+  }, [userProfile?.name]);
+
+  useEffect(() => {
+    if (selectedExam) {
+      setTargetExam(selectedExam === 'NEET' ? 'NEET (UG)' : 'JEE MAIN');
+    }
+  }, [selectedExam]);
+
+  useEffect(() => {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(progressMap));
     } catch {
@@ -54,10 +74,11 @@ export const SyllabusTrackerModal: React.FC<SyllabusTrackerModalProps> = ({
   }, [progressMap]);
 
   useEffect(() => {
-    if (initialSubject) {
-      setActiveTab(initialSubject);
+    const tabToSet = initialCategory || initialSubject;
+    if (tabToSet) {
+      setActiveTab(tabToSet);
     }
-  }, [initialSubject]);
+  }, [initialCategory, initialSubject]);
 
   const toggleProgressField = (chapterId: string, field: keyof Omit<ChapterProgress, 'chapterId' | 'mockScore' | 'notes' | 'revisionDate'>) => {
     setProgressMap((prev) => {
